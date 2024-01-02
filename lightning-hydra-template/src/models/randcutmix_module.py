@@ -148,15 +148,11 @@ class RandcutmixModule(LightningModule):
         r = np.random.rand(1)
         beta = 1.0
         if self.aug == 'randcutmix' and r < 0.5:
-            # generate mixed sample
             lam = np.random.beta(beta, beta)
-
             rand_index = torch.randperm(inputs.size()[0]).cuda()
 
-            # loss 위해 target 재정의
             target_a = targets
             target_b = targets[rand_index]
-
 
             bbx1, bby1, bbx2, bby2 = self.rand_bbox(inputs.size(), lam)
 
@@ -174,28 +170,34 @@ class RandcutmixModule(LightningModule):
                         'inputs[i] = torchvision.transforms.RandomAffine(0,(0.2,0))(inputs[i])', 'inputs[i] = torchvision.transforms.RandomAffine(0,(0,0.2))(inputs[i])',
                         'inputs[i] = torchvision.transforms.RandomAffine(0,shear=(-20,20,0,0))(inputs[i])', 'inputs[i] = torchvision.transforms.RandomAffine(0,shear=(-0,0,-20,20))(inputs[i])']
 
-            # 선택
             cutmix_imgs = inputs[rand_index, :, :, :]
             for i in range(inputs.size()[0]):
                 chocie_cutmix = random.randrange(0,len(transform_cutmix))
                 choice_original = random.randrange(0,len(transform_original))
 
-                # 변환 - 작은 이미지
                 exec(transform_cutmix[chocie_cutmix])
-
-                # 변환 - 바탕 이미지
                 exec(transform_original[choice_original])
 
-                
             inputs[:, :, bbx1:bbx2, bby1:bby2] = cutmix_imgs[:, :, bbx1:bbx2, bby1:bby2]
-
-            # adjust lambda to exactly match pixel ratio
             lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
-
-            # compute output
             outputs = self.forward(inputs)
             loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)
             
+        elif self.aug == 'cutmix' and r < 0.5:
+            lam = np.random.beta(beta, beta)
+
+            rand_index = torch.randperm(inputs.size()[0]).cuda()
+            target_a = targets
+            target_b = targets[rand_index]
+
+            bbx1, bby1, bbx2, bby2 = self.rand_bbox(inputs.size(), lam)
+            inputs[:, :, bbx1:bbx2, bby1:bby2] = inputs[rand_index, :, bbx1:bbx2, bby1:bby2]
+            
+            lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+            
+            outputs = self.forward(inputs)
+            loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)
+        
         else:
             outputs = self.forward(inputs)
             loss = self.criterion(outputs, targets)
