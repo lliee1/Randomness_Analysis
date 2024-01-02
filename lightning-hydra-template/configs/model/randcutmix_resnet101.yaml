@@ -1,0 +1,20 @@
+_target_: src.models.randcutmix_module.RandcutmixModule
+
+optimizer:
+  _target_: torch.optim.SGD
+  _partial_: true
+  lr: 0.1
+  momentum: 0.9
+  weight_decay: 5e-4
+
+scheduler: null
+net:
+  _target_: timm.create_model
+  model_name: 'resnet101.a1_in1k'
+  pretrained: True
+
+aug: randcutmix
+model_name: 'resnet101'
+
+# compile model for faster training with pytorch 2.0
+compile: false

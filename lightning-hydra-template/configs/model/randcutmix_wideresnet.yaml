@@ -1,18 +1,13 @@
 _target_: src.models.randcutmix_module.RandcutmixModule
 
 optimizer:
-  _target_: torch.optim.Adam
+  _target_: torch.optim.SGD
   _partial_: true
-  lr: 0.001
-  weight_decay: 0.0
+  lr: 0.1
+  momentum: 0.9
+  weight_decay: 5e-4
 
-scheduler:
-  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  _partial_: true
-  mode: min
-  factor: 0.1
-  patience: 10
-
+scheduler: null
 net:
   _target_: src.models.components.wide_resnet.Wide_ResNet
   depth: 28
@@ -20,6 +15,9 @@ net:
   dropout_rate: 0
   num_classes: 200
   dataset: tinyImage
+
+aug: randcutmix
+model_name: wide_resnet
 
 # compile model for faster training with pytorch 2.0
 compile: false
