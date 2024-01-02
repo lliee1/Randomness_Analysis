@@ -5,8 +5,8 @@ from lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.datasets import MNIST
 from torchvision.transforms import transforms
-
-
+import glob, re
+from data.components.tiny_image_net import TinyImagenet
 class RandcutmixDataModule(LightningDataModule):
     """`LightningDataModule` for the MNIST dataset.
 
@@ -54,8 +54,6 @@ class RandcutmixDataModule(LightningDataModule):
 
     def __init__(
         self,
-        data_dir: str = "data/",
-        train_val_test_split: Tuple[int, int, int] = (55_000, 5_000, 10_000),
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
@@ -73,55 +71,44 @@ class RandcutmixDataModule(LightningDataModule):
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
+        train_image_path = sorted(glob.glob('./data/tiny-imagenet-200/train/*/*/*.JPEG'))
+        val_image_path = (glob.glob('./data/tiny-imagenet-200/val/*/*.JPEG'))
+        annotation = './data/tiny-imagenet-200/val/val_annotations.txt'
+
+        # sort
+        regex = re.compile('\d+')
+        def sort_by_number(string):
+            return [int(s) if s.isdigit() else s for s in regex.findall(string)]
+        val_image_path = sorted(val_image_path, key=sort_by_number)
+
+
+        ls = []
+        for path in train_image_path:
+            ls.append(path.split('/')[-3])
+        ls = list(set(ls))
+        ls.sort()
 
         # data transformations
-        self.transforms = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-        )
+        transform_train = transforms.Compose([
+                            transforms.RandomCrop(64, padding=4),
+                            transforms.RandomHorizontalFlip(),
+                            transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5),
+                            )])
 
-        self.data_train: Optional[Dataset] = None
-        self.data_val: Optional[Dataset] = None
+        transform_test = transforms.Compose([
+                            transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)),
+                            ])
+
+        self.data_train: Optional[Dataset] = TinyImagenet(train_image_path, ls, transform_train)
+        self.data_val: Optional[Dataset] = TinyImagenet(val_image_path, ls, transform_test, annotation)
         self.data_test: Optional[Dataset] = None
 
-    @property
-    def num_classes(self) -> int:
-        """Get the number of classes.
-
-        :return: The number of MNIST classes (10).
-        """
-        return 10
 
     def prepare_data(self) -> None:
-        """Download data if needed. Lightning ensures that `self.prepare_data()` is called only
-        within a single process on CPU, so you can safely add your downloading logic within. In
-        case of multi-node training, the execution of this hook depends upon
-        `self.prepare_data_per_node()`.
-
-        Do not use it to assign state (self.x = y).
-        """
-        MNIST(self.hparams.data_dir, train=True, download=True)
-        MNIST(self.hparams.data_dir, train=False, download=True)
+        pass
 
     def setup(self, stage: Optional[str] = None) -> None:
-        """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
-
-        This method is called by Lightning before `trainer.fit()`, `trainer.validate()`, `trainer.test()`, and
-        `trainer.predict()`, so be careful not to execute things like random split twice! Also, it is called after
-        `self.prepare_data()` and there is a barrier in between which ensures that all the processes proceed to
-        `self.setup()` once the data is prepared and available for use.
-
-        :param stage: The stage to setup. Either `"fit"`, `"validate"`, `"test"`, or `"predict"`. Defaults to ``None``.
-        """
-        # load and split datasets only if not loaded already
-        if not self.data_train and not self.data_val and not self.data_test:
-            trainset = MNIST(self.hparams.data_dir, train=True, transform=self.transforms)
-            testset = MNIST(self.hparams.data_dir, train=False, transform=self.transforms)
-            dataset = ConcatDataset(datasets=[trainset, testset])
-            self.data_train, self.data_val, self.data_test = random_split(
-                dataset=dataset,
-                lengths=self.hparams.train_val_test_split,
-                generator=torch.Generator().manual_seed(42),
-            )
+        pass
 
     def train_dataloader(self) -> DataLoader[Any]:
         """Create and return the train dataloader.
