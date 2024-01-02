@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.init as init
 import torch.nn.functional as F
 from torch.autograd import Variable
-
+import math
 import sys
 import numpy as np
 
@@ -102,8 +102,23 @@ class Wide_ResNet(nn.Module):
 
         return out
 
+
+
+def learning_rate(epoch):
+    optim_factor = 0
+    if(epoch > 160):
+        optim_factor = 3
+    elif(epoch > 120):
+        optim_factor = 2
+    elif(epoch > 60):
+        optim_factor = 1
+
+    return 0.1*math.pow(0.2, optim_factor)
+
 if __name__ == '__main__':
     net=Wide_ResNet(28, 10, 0.3, 10, dataset='cifar10')
     print(net)
     a = torch.rand([1,3, 32, 32])
     out = net(a)
+
+

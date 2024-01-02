@@ -4,8 +4,11 @@ import torch
 from lightning import LightningModule
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.classification.accuracy import Accuracy
-
-
+import numpy as np
+import random
+import math
+import torchvision
+import torch.nn as nn
 class RandcutmixModule(LightningModule):
     """Example of a `LightningModule` for MNIST classification.
 
@@ -45,6 +48,8 @@ class RandcutmixModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         compile: bool,
+        aug: str,
+        model_name: str,
     ) -> None:
         """Initialize a `MNISTLitModule`.
 
@@ -57,25 +62,61 @@ class RandcutmixModule(LightningModule):
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
+        
 
+        
         self.net = net
+        
+        if model_name != 'wide_resnet':
+            num_classes = 200
+            net.fc = nn.Linear(net.fc.in_features, num_classes)
 
         # loss function
         self.criterion = torch.nn.CrossEntropyLoss()
 
         # metric objects for calculating and averaging accuracy across batches
-        self.train_acc = Accuracy(task="multiclass", num_classes=10)
-        self.val_acc = Accuracy(task="multiclass", num_classes=10)
-        self.test_acc = Accuracy(task="multiclass", num_classes=10)
+        self.train_acc = Accuracy(task="multiclass", num_classes=200)
+        self.val_acc = Accuracy(task="multiclass", num_classes=200)
 
         # for averaging loss across batches
         self.train_loss = MeanMetric()
         self.val_loss = MeanMetric()
-        self.test_loss = MeanMetric()
 
         # for tracking best so far validation accuracy
         self.val_acc_best = MaxMetric()
+        self.aug = aug
+        
+    # scheduler
+    def learning_rate(self,epoch):
+        optim_factor = 0
+        if(epoch > 160):
+            optim_factor = 3
+        elif(epoch > 120):
+            optim_factor = 2
+        elif(epoch > 60):
+            optim_factor = 1
 
+        return 0.1*math.pow(0.2, optim_factor)    
+     
+    def rand_bbox(self, size, lam):
+        W = size[2] # Batch_size x Channel x Width x Height 
+        H = size[3]
+
+        cut_rat = np.sqrt(1. - lam)
+
+        cut_w = np.int(W * cut_rat)
+        cut_h = np.int(H * cut_rat)
+
+        cx = np.random.randint(W)
+        cy = np.random.randint(H)
+
+        bbx1 = np.clip(cx - cut_w // 2, 0, W)
+        bby1 = np.clip(cy - cut_h // 2, 0, H)
+        bbx2 = np.clip(cx + cut_w // 2, 0, W)
+        bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+        return bbx1, bby1, bbx2, bby2    
+    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the model `self.net`.
 
@@ -90,9 +131,8 @@ class RandcutmixModule(LightningModule):
         # so it's worth to make sure validation metrics don't store results from these checks
         self.val_loss.reset()
         self.val_acc.reset()
-        self.val_acc_best.reset()
 
-    def model_step(
+    def train_model_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Perform a single model step on a batch of data.
@@ -104,12 +144,82 @@ class RandcutmixModule(LightningModule):
             - A tensor of predictions.
             - A tensor of target labels.
         """
-        x, y = batch
-        logits = self.forward(x)
-        loss = self.criterion(logits, y)
-        preds = torch.argmax(logits, dim=1)
-        return loss, preds, y
+        inputs, targets = batch
+        r = np.random.rand(1)
+        beta = 1.0
+        if self.aug == 'randcutmix' and r < 0.5:
+            # generate mixed sample
+            lam = np.random.beta(beta, beta)
 
+            rand_index = torch.randperm(inputs.size()[0]).cuda()
+
+            # loss 위해 target 재정의
+            target_a = targets
+            target_b = targets[rand_index]
+
+
+            bbx1, bby1, bbx2, bby2 = self.rand_bbox(inputs.size(), lam)
+
+            transform_cutmix = ['', 'cutmix_imgs[i] = torchvision.transforms.functional.autocontrast(cutmix_imgs[i])','cutmix_imgs[i] = torchvision.transforms.functional.invert(cutmix_imgs[i])',
+                        'cutmix_imgs[i] = torchvision.transforms.functional.adjust_brightness(cutmix_imgs[i],2)','cutmix_imgs[i] = torchvision.transforms.functional.adjust_sharpness(cutmix_imgs[i],2)',
+                        'cutmix_imgs[i] = torchvision.transforms.RandomRotation(180)(cutmix_imgs[i])',
+                        'cutmix_imgs[i] = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)(cutmix_imgs[i])',
+                        'cutmix_imgs[i] = torchvision.transforms.RandomAffine(0,(0.2,0))(cutmix_imgs[i])', 'cutmix_imgs[i] = torchvision.transforms.RandomAffine(0,(0,0.2))(cutmix_imgs[i])',
+                        'cutmix_imgs[i] = torchvision.transforms.RandomAffine(0,shear=(-20,20,0,0))(cutmix_imgs[i])', 'cutmix_imgs[i] = torchvision.transforms.RandomAffine(0,shear=(-0,0,-20,20))(cutmix_imgs[i])']
+            
+            transform_original = ['', 'inputs[i] = torchvision.transforms.functional.autocontrast(inputs[i])','inputs[i] = torchvision.transforms.functional.invert(inputs[i])',
+                        'inputs[i] = torchvision.transforms.functional.adjust_brightness(inputs[i],2)','inputs[i] = torchvision.transforms.functional.adjust_sharpness(inputs[i],2)',
+                        'inputs[i] = torchvision.transforms.RandomRotation(180)(inputs[i])',
+                        'inputs[i] = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)(inputs[i])',
+                        'inputs[i] = torchvision.transforms.RandomAffine(0,(0.2,0))(inputs[i])', 'inputs[i] = torchvision.transforms.RandomAffine(0,(0,0.2))(inputs[i])',
+                        'inputs[i] = torchvision.transforms.RandomAffine(0,shear=(-20,20,0,0))(inputs[i])', 'inputs[i] = torchvision.transforms.RandomAffine(0,shear=(-0,0,-20,20))(inputs[i])']
+
+            # 선택
+            cutmix_imgs = inputs[rand_index, :, :, :]
+            for i in range(inputs.size()[0]):
+                chocie_cutmix = random.randrange(0,len(transform_cutmix))
+                choice_original = random.randrange(0,len(transform_original))
+
+                # 변환 - 작은 이미지
+                exec(transform_cutmix[chocie_cutmix])
+
+                # 변환 - 바탕 이미지
+                exec(transform_original[choice_original])
+
+                
+            inputs[:, :, bbx1:bbx2, bby1:bby2] = cutmix_imgs[:, :, bbx1:bbx2, bby1:bby2]
+
+            # adjust lambda to exactly match pixel ratio
+            lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+
+            # compute output
+            outputs = self.forward(inputs)
+            loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)
+            
+        else:
+            outputs = self.forward(inputs)
+            loss = self.criterion(outputs, targets)
+        preds = torch.argmax(outputs, dim=1)
+        return loss, preds, targets
+
+    def val_model_step(
+        self, batch: Tuple[torch.Tensor, torch.Tensor]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Perform a single model step on a batch of data.
+
+        :param batch: A batch of data (a tuple) containing the input tensor of images and target labels.
+
+        :return: A tuple containing (in order):
+            - A tensor of losses.
+            - A tensor of predictions.
+            - A tensor of target labels.
+        """
+        inputs, targets = batch
+        outputs = self.forward(inputs) 
+        preds = torch.argmax(outputs, dim=1)
+        loss = self.criterion(outputs, targets)
+        return loss, preds, targets
+    
     def training_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
@@ -120,20 +230,22 @@ class RandcutmixModule(LightningModule):
         :param batch_idx: The index of the current batch.
         :return: A tensor of losses between model predictions and targets.
         """
-        loss, preds, targets = self.model_step(batch)
+        loss, preds, targets = self.train_model_step(batch)
 
         # update and log metrics
         self.train_loss(loss)
         self.train_acc(preds, targets)
-        self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train/loss", self.train_loss, on_step=True, on_epoch=False, prog_bar=True)
+        self.log("train/acc", self.train_acc, on_step=True, on_epoch=False, prog_bar=True)
 
         # return loss or backpropagation will fail
         return loss
 
+
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
         pass
+
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single validation step on a batch of data from the validation set.
@@ -142,13 +254,14 @@ class RandcutmixModule(LightningModule):
             labels.
         :param batch_idx: The index of the current batch.
         """
-        loss, preds, targets = self.model_step(batch)
+        loss, preds, targets = self.val_model_step(batch)
 
         # update and log metrics
         self.val_loss(loss)
         self.val_acc(preds, targets)
-        self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+
 
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
@@ -199,13 +312,14 @@ class RandcutmixModule(LightningModule):
         :return: A dict containing the configured optimizers and learning-rate schedulers to be used for training.
         """
         optimizer = self.hparams.optimizer(params=self.parameters())
+        self.hparams.scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=self.learning_rate)
         if self.hparams.scheduler is not None:
-            scheduler = self.hparams.scheduler(optimizer=optimizer)
+            scheduler = self.hparams.scheduler
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {
                     "scheduler": scheduler,
-                    "monitor": "val/loss",
+                    "monitor": "val/acc",
                     "interval": "epoch",
                     "frequency": 1,
                 },
