@@ -67,9 +67,14 @@ class RandcutmixModule(LightningModule):
         
         self.net = net
         
-        if model_name != 'wide_resnet':
+        
+        if model_name == 'efficientnet_b0':
+            num_classes = 200
+            net.classifier = nn.Linear(net.classifier.in_features, num_classes)
+        elif model_name != 'wide_resnet':
             num_classes = 200
             net.fc = nn.Linear(net.fc.in_features, num_classes)
+            
 
         # loss function
         self.criterion = torch.nn.CrossEntropyLoss()
