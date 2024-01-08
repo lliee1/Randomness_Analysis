@@ -11,7 +11,7 @@ scheduler: null
 net:
   _target_: timm.create_model
   model_name: 'resnet101.a1_in1k'
-  pretrained: True
+  pretrained: False
 
 aug: randcutmix
 model_name: 'resnet101'
