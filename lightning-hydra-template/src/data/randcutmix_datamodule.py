@@ -8,6 +8,7 @@ from torchvision.transforms import transforms
 import glob, re
 from data.components.tiny_image_net import TinyImagenet
 import numpy as np
+from torchvision.transforms.functional import InterpolationMode
 class Cutout(object):
     def __init__(self, n_holes, length):
         self.n_holes = n_holes
@@ -87,6 +88,7 @@ class RandcutmixDataModule(LightningDataModule):
         num_workers: int = 0,
         pin_memory: bool = False,
         aug: str = '',
+        resize: bool = False,
     ) -> None:
         """Initialize a `MNISTDataModule`.
 
@@ -119,15 +121,30 @@ class RandcutmixDataModule(LightningDataModule):
         ls.sort()
 
         # data transformations
-        transform_train = transforms.Compose([
-                            transforms.RandomCrop(64, padding=4),
-                            transforms.RandomHorizontalFlip(),
-                            transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5),
-                            )])
+        if resize:
+            transform_train = transforms.Compose([
+                                transforms.Resize(384, interpolation=InterpolationMode.BICUBIC),
+                                transforms.RandomHorizontalFlip(),
+                                transforms.Normalize(
+                                    mean=(0.485, 0.456, 0.406),
+                                    std=(0.229, 0.224, 0.225))
+                                ])
+            transform_test = transforms.Compose([
+                                transforms.Resize(384, interpolation=InterpolationMode.BICUBIC),
+                                transforms.Normalize(
+                                    mean=(0.485, 0.456, 0.406),
+                                    std=(0.229, 0.224, 0.225))
+                                ])
+        else:
+            transform_train = transforms.Compose([
+                                transforms.RandomCrop(64, padding=4),
+                                transforms.RandomHorizontalFlip(),
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5),
+                                )])
 
-        transform_test = transforms.Compose([
-                            transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)),
-                            ])
+            transform_test = transforms.Compose([
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)),
+                                ])
 
         if aug == 'cutout':
             transform_train.transforms.append(Cutout(n_holes=1, length=8))

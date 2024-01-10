@@ -1,0 +1,22 @@
+_target_: src.models.randcutmix_module.RandcutmixModule
+
+optimizer:
+  _target_: torch.optim.SGD
+  _partial_: true
+  lr: 0.1
+  momentum: 0.9
+  weight_decay: 5e-4
+
+scheduler: null
+net:
+  _target_: timm.create_model
+  model_name: 'swin_large_patch4_window12_384'
+  pretrained: False
+  drop_path_rate: 0.1
+  num_classes: 200
+
+aug: baseline
+model_name: 'swin_L'
+
+# compile model for faster training with pytorch 2.0
+compile: false
