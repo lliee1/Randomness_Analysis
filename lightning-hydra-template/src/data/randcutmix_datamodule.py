@@ -88,6 +88,7 @@ class RandcutmixDataModule(LightningDataModule):
         num_workers: int = 0,
         pin_memory: bool = False,
         aug: str = '',
+        normalize: bool = False,
         resize: bool = False,
     ) -> None:
         """Initialize a `MNISTDataModule`.
@@ -135,6 +136,21 @@ class RandcutmixDataModule(LightningDataModule):
                                     mean=(0.485, 0.456, 0.406),
                                     std=(0.229, 0.224, 0.225))
                                 ])
+        elif normalize:
+            transform_train = transforms.Compose([
+                                transforms.RandomCrop(64, padding=4),
+                                transforms.RandomHorizontalFlip(),
+                                transforms.Normalize(
+                                    mean=(0.485, 0.456, 0.406),
+                                    std=(0.229, 0.224, 0.225))
+                                ])
+
+            transform_test = transforms.Compose([
+                                transforms.Normalize(
+                                    mean=(0.485, 0.456, 0.406),
+                                    std=(0.229, 0.224, 0.225))
+                                ])
+            
         else:
             transform_train = transforms.Compose([
                                 transforms.RandomCrop(64, padding=4),
