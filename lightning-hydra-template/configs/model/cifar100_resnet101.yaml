@@ -9,15 +9,12 @@ optimizer:
 
 scheduler: null
 net:
-  _target_: src.models.components.wide_resnet.Wide_ResNet
-  depth: 28
-  widen_factor: 10
-  dropout_rate: 0
-  num_classes: 200
-  dataset: tinyImage
+  _target_: timm.create_model
+  model_name: 'resnet101.a1_in1k'
+  pretrained: False
 
 aug: baseline
-model_name: wide_resnet
+model_name: 'resnet101'
 
 # compile model for faster training with pytorch 2.0
 compile: false

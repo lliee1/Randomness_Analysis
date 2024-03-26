@@ -1,4 +1,4 @@
-_target_: src.models.randcutmix_module.RandcutmixModule
+_target_: src.models.cifar100_module.cifar100Module
 
 optimizer:
   _target_: torch.optim.SGD
@@ -10,11 +10,11 @@ optimizer:
 scheduler: null
 net:
   _target_: timm.create_model
-  model_name: 'efficientnet_b0'
+  model_name: 'resnet50.a1_in1k'
   pretrained: False
 
-aug: randcutmix
-model_name: 'efficientnet_b0'
+aug: mixup
+model_name: 'resnet50'
 
 # compile model for faster training with pytorch 2.0
 compile: false

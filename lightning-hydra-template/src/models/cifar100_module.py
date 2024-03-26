@@ -9,7 +9,7 @@ import random
 import math
 import torchvision
 import torch.nn as nn
-class RandcutmixModule(LightningModule):
+class cifar100Module(LightningModule):
     """Example of a `LightningModule` for MNIST classification.
 
     A `LightningModule` implements 8 key methods:
@@ -63,12 +63,10 @@ class RandcutmixModule(LightningModule):
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
         
-
-        
         self.net = net
         
         if model_name != 'wide_resnet':
-            num_classes = 200
+            num_classes = 100
             net.reset_classifier(num_classes=num_classes)
             
 
@@ -76,8 +74,8 @@ class RandcutmixModule(LightningModule):
         self.criterion = torch.nn.CrossEntropyLoss()
 
         # metric objects for calculating and averaging accuracy across batches
-        self.train_acc = Accuracy(task="multiclass", num_classes=200)
-        self.val_acc = Accuracy(task="multiclass", num_classes=200)
+        self.train_acc = Accuracy(task="multiclass", num_classes=100)
+        self.val_acc = Accuracy(task="multiclass", num_classes=100)
 
         # for averaging loss across batches
         self.train_loss = MeanMetric()
@@ -228,7 +226,7 @@ class RandcutmixModule(LightningModule):
             
             outputs = self.forward(inputs)
             loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)
-        
+            
         elif self.aug == 'mixup' and r < 0.5:
             lam = np.random.beta(beta, beta)
             rand_index = torch.randperm(inputs.size()[0]).cuda()
@@ -263,7 +261,7 @@ class RandcutmixModule(LightningModule):
             inputs = lam * inputs + (1 - lam) * inputs[rand_index, :]
             outputs = self.forward(inputs)
             loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)
-            
+               
         else:
             outputs = self.forward(inputs)
             loss = self.criterion(outputs, targets)

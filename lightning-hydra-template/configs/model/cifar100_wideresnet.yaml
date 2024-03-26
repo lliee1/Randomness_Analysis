@@ -1,4 +1,4 @@
-_target_: src.models.randcutmix_module.RandcutmixModule
+_target_: src.models.cifar100_module.cifar100Module
 
 optimizer:
   _target_: torch.optim.SGD
@@ -13,10 +13,10 @@ net:
   depth: 28
   widen_factor: 10
   dropout_rate: 0
-  num_classes: 200
-  dataset: tinyImage
+  num_classes: 100
+  dataset: cifar100
 
-aug: baseline
+aug: randcutmix
 model_name: wide_resnet
 
 # compile model for faster training with pytorch 2.0

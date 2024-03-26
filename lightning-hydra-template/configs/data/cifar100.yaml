@@ -1,8 +1,8 @@
-_target_: src.data.randcutmix_datamodule.RandcutmixDataModule
+_target_: src.data.cifar100_datamodule.cifar100DataModule
 batch_size: 64
 num_workers: 4
 pin_memory: True
-aug: cutmix
+aug: mixup
 normalize: False
 
 # swin_L, vit_L ...
