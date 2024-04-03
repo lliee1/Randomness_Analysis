@@ -254,11 +254,8 @@ class RandcutmixModule(LightningModule):
                         'inputs[i] = torchvision.transforms.RandomAffine(0,shear=(-20,20,0,0))(inputs[i])', 'inputs[i] = torchvision.transforms.RandomAffine(0,shear=(-0,0,-20,20))(inputs[i])']
             
             for i in range(inputs.size()[0]):
-                chocie_cutmix = random.randrange(0,len(transform_cutmix))
-                choice_original = random.randrange(0,len(transform_original))
-
-                exec(transform_cutmix[chocie_cutmix])
-                exec(transform_original[choice_original])           
+                choice_transform = random.randrange(0, len(transform_original))
+                exec(transform_original[choice_transform])     
                 
             inputs = lam * inputs + (1 - lam) * inputs[rand_index, :]
             outputs = self.forward(inputs)
