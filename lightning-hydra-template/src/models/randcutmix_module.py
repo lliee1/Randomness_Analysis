@@ -261,6 +261,31 @@ class RandcutmixModule(LightningModule):
             outputs = self.forward(inputs)
             loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)
             
+        elif self.aug == "randone_mixup" and r < 0.5:
+            lam = np.random.beta(beta, beta)
+            rand_index = torch.randperm(inputs.size()[0]).cuda()
+            target_a = targets
+            target_b = targets[rand_index]
+                        
+            transform_original = ['', 'inputs[i] = torchvision.transforms.functional.autocontrast(inputs[i])','inputs[i] = torchvision.transforms.functional.invert(inputs[i])',
+                        'inputs[i] = torchvision.transforms.functional.adjust_brightness(inputs[i],2)','inputs[i] = torchvision.transforms.functional.adjust_sharpness(inputs[i],2)',
+                        'inputs[i] = torchvision.transforms.RandomRotation(180)(inputs[i])',
+                        'inputs[i] = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)(inputs[i])',
+                        'inputs[i] = torchvision.transforms.RandomAffine(0,(0.2,0))(inputs[i])', 'inputs[i] = torchvision.transforms.RandomAffine(0,(0,0.2))(inputs[i])',
+                        'inputs[i] = torchvision.transforms.RandomAffine(0,shear=(-20,20,0,0))(inputs[i])', 'inputs[i] = torchvision.transforms.RandomAffine(0,shear=(-0,0,-20,20))(inputs[i])']
+            
+                 
+            # first mixup
+            inputs = lam * inputs + (1 - lam) * inputs[rand_index, :]
+            
+            # and randone
+            for i in range(inputs.size()[0]):
+                choice_transform = random.randrange(0, len(transform_original))
+                exec(transform_original[choice_transform])
+                
+            outputs = self.forward(inputs)
+            loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)     
+                      
         else:
             outputs = self.forward(inputs)
             loss = self.criterion(outputs, targets)
