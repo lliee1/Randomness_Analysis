@@ -1,4 +1,4 @@
-_target_: src.models.randcutmix_module.RandcutmixModule
+_target_: src.models.cifar100_module.cifar100Module
 
 optimizer:
   _target_: torch.optim.SGD

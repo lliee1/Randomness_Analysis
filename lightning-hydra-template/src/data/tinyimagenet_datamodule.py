@@ -9,6 +9,7 @@ import glob, re
 from data.components.tiny_image_net import TinyImagenet
 import numpy as np
 from torchvision.transforms.functional import InterpolationMode
+import torchvision
 class Cutout(object):
     def __init__(self, n_holes, length):
         self.n_holes = n_holes
@@ -37,7 +38,7 @@ class Cutout(object):
 
         return img
 
-class RandcutmixDataModule(LightningDataModule):
+class TinyimagenetDataModule(LightningDataModule):
     """`LightningDataModule` for the MNIST dataset.
 
     The MNIST database of handwritten digits has a training set of 60,000 examples, and a test set of 10,000 examples.
@@ -89,7 +90,6 @@ class RandcutmixDataModule(LightningDataModule):
         pin_memory: bool = False,
         aug: str = '',
         normalize: bool = False,
-        resize: bool = False,
     ) -> None:
         """Initialize a `MNISTDataModule`.
 
@@ -122,30 +122,18 @@ class RandcutmixDataModule(LightningDataModule):
         ls.sort()
 
         # data transformations
-        if resize:
-            transform_train = transforms.Compose([
-                                transforms.Resize(384, interpolation=InterpolationMode.BICUBIC),
-                                transforms.RandomHorizontalFlip(),
-                                transforms.Normalize(
-                                    mean=(0.485, 0.456, 0.406),
-                                    std=(0.229, 0.224, 0.225))
-                                ])
-            transform_test = transforms.Compose([
-                                transforms.Resize(384, interpolation=InterpolationMode.BICUBIC),
-                                transforms.Normalize(
-                                    mean=(0.485, 0.456, 0.406),
-                                    std=(0.229, 0.224, 0.225))
-                                ])
-        elif normalize:
+        if normalize:
             transform_train = transforms.Compose([
                                 transforms.RandomCrop(64, padding=4),
                                 transforms.RandomHorizontalFlip(),
+                                transforms.ToTensor(),
                                 transforms.Normalize(
                                     mean=(0.485, 0.456, 0.406),
                                     std=(0.229, 0.224, 0.225))
                                 ])
 
             transform_test = transforms.Compose([
+                                transforms.ToTensor(),
                                 transforms.Normalize(
                                     mean=(0.485, 0.456, 0.406),
                                     std=(0.229, 0.224, 0.225))
@@ -155,16 +143,35 @@ class RandcutmixDataModule(LightningDataModule):
             transform_train = transforms.Compose([
                                 transforms.RandomCrop(64, padding=4),
                                 transforms.RandomHorizontalFlip(),
+                                transforms.ToTensor(),
                                 transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5),
                                 )])
 
             transform_test = transforms.Compose([
+                                transforms.ToTensor(),
                                 transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)),
                                 ])
 
         if aug == 'cutout':
             transform_train.transforms.append(Cutout(n_holes=1, length=8))
             
+        elif aug == 'randaug_cutmix' or aug == 'randaug_mixup':
+            transform_train = transforms.Compose([
+                                transforms.RandomCrop(64, padding=4),
+                                transforms.RandomHorizontalFlip(),
+                                torchvision.transforms.RandAugment(num_ops=2, magnitude=9),
+                                transforms.ToTensor(),
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5),
+                                )])
+            
+        elif aug == 'cutmix_randaug' or aug == 'mixup_randaug':
+            transform_train = transforms.Compose([
+                                transforms.RandomCrop(64, padding=4),
+                                transforms.RandomHorizontalFlip(),
+                                transforms.ToTensor()
+                                ])
+            
+               
         self.data_train: Optional[Dataset] = TinyImagenet(train_image_path, ls, transform_train)
         self.data_val: Optional[Dataset] = TinyImagenet(val_image_path, ls, transform_test, annotation)
         self.data_test: Optional[Dataset] = None

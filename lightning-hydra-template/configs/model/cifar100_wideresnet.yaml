@@ -16,7 +16,7 @@ net:
   num_classes: 100
   dataset: cifar100
 
-aug: randcutmix
+aug: baseline
 model_name: wide_resnet
 
 # compile model for faster training with pytorch 2.0

@@ -1,4 +1,4 @@
-_target_: src.models.randcutmix_module.RandcutmixModule
+_target_: src.models.tinyimagenet_module.TinyimagenetModule
 
 optimizer:
   _target_: torch.optim.SGD
@@ -9,13 +9,15 @@ optimizer:
 
 scheduler: null
 net:
-  _target_: timm.create_model
-  model_name: 'resnext101_32x8d'
-  pretrained: False
+  _target_: src.models.components.wide_resnet.Wide_ResNet
+  depth: 28
+  widen_factor: 10
+  dropout_rate: 0
   num_classes: 200
+  dataset: tinyImage
 
 aug: baseline
-model_name: 'resnext101'
+model_name: wide_resnet
 
 # compile model for faster training with pytorch 2.0
 compile: false

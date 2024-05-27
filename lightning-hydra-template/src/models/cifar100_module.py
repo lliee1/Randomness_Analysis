@@ -9,6 +9,8 @@ import random
 import math
 import torchvision
 import torch.nn as nn
+from PIL import Image
+
 class cifar100Module(LightningModule):
     """Example of a `LightningModule` for MNIST classification.
 
@@ -148,7 +150,7 @@ class cifar100Module(LightningModule):
         inputs, targets = batch
         r = np.random.rand(1)
         beta = 1.0
-        if self.aug == 'randcutmix' and r < 0.5:
+        if self.aug == 'randour_cutmix' and r < 0.5:
             lam = np.random.beta(beta, beta)
             rand_index = torch.randperm(inputs.size()[0]).cuda()
 
@@ -184,7 +186,7 @@ class cifar100Module(LightningModule):
             outputs = self.forward(inputs)
             loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)
 
-        elif self.aug == 'randone' and r < 0.5:
+        elif self.aug == 'cutmix_randour' and r < 0.5:
             transform_original = ['', 'inputs[i] = torchvision.transforms.functional.autocontrast(inputs[i])','inputs[i] = torchvision.transforms.functional.invert(inputs[i])',
                         'inputs[i] = torchvision.transforms.functional.adjust_brightness(inputs[i],2)','inputs[i] = torchvision.transforms.functional.adjust_sharpness(inputs[i],2)',
                         'inputs[i] = torchvision.transforms.RandomRotation(180)(inputs[i])',
@@ -237,53 +239,62 @@ class cifar100Module(LightningModule):
             inputs = lam * inputs + (1 - lam) * inputs[rand_index, :]
             outputs = self.forward(inputs)
             loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)
-            
-        elif self.aug == "rand_mixup" and r < 0.5:
+
+
+        elif self.aug == 'randaug_mixup' and r < 0.5:
             lam = np.random.beta(beta, beta)
             rand_index = torch.randperm(inputs.size()[0]).cuda()
             target_a = targets
             target_b = targets[rand_index]
-                        
-            transform_original = ['', 'inputs[i] = torchvision.transforms.functional.autocontrast(inputs[i])','inputs[i] = torchvision.transforms.functional.invert(inputs[i])',
-                        'inputs[i] = torchvision.transforms.functional.adjust_brightness(inputs[i],2)','inputs[i] = torchvision.transforms.functional.adjust_sharpness(inputs[i],2)',
-                        'inputs[i] = torchvision.transforms.RandomRotation(180)(inputs[i])',
-                        'inputs[i] = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)(inputs[i])',
-                        'inputs[i] = torchvision.transforms.RandomAffine(0,(0.2,0))(inputs[i])', 'inputs[i] = torchvision.transforms.RandomAffine(0,(0,0.2))(inputs[i])',
-                        'inputs[i] = torchvision.transforms.RandomAffine(0,shear=(-20,20,0,0))(inputs[i])', 'inputs[i] = torchvision.transforms.RandomAffine(0,shear=(-0,0,-20,20))(inputs[i])']
             
-            for i in range(inputs.size()[0]):
-                choice_transform = random.randrange(0, len(transform_original))
-                exec(transform_original[choice_transform])     
-                
             inputs = lam * inputs + (1 - lam) * inputs[rand_index, :]
             outputs = self.forward(inputs)
             loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)
-
-        elif self.aug == "randone_mixup" and r < 0.5:
+            
+        elif self.aug == 'randaug_cutmix' and r < 0.5:
             lam = np.random.beta(beta, beta)
             rand_index = torch.randperm(inputs.size()[0]).cuda()
+
             target_a = targets
             target_b = targets[rand_index]
-                        
-            transform_original = ['', 'inputs[i] = torchvision.transforms.functional.autocontrast(inputs[i])','inputs[i] = torchvision.transforms.functional.invert(inputs[i])',
-                        'inputs[i] = torchvision.transforms.functional.adjust_brightness(inputs[i],2)','inputs[i] = torchvision.transforms.functional.adjust_sharpness(inputs[i],2)',
-                        'inputs[i] = torchvision.transforms.RandomRotation(180)(inputs[i])',
-                        'inputs[i] = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)(inputs[i])',
-                        'inputs[i] = torchvision.transforms.RandomAffine(0,(0.2,0))(inputs[i])', 'inputs[i] = torchvision.transforms.RandomAffine(0,(0,0.2))(inputs[i])',
-                        'inputs[i] = torchvision.transforms.RandomAffine(0,shear=(-20,20,0,0))(inputs[i])', 'inputs[i] = torchvision.transforms.RandomAffine(0,shear=(-0,0,-20,20))(inputs[i])']
-            
-                 
-            # first mixup
-            inputs = lam * inputs + (1 - lam) * inputs[rand_index, :]
-            
-            # and randone
-            for i in range(inputs.size()[0]):
-                choice_transform = random.randrange(0, len(transform_original))
-                exec(transform_original[choice_transform])
+
+            bbx1, bby1, bbx2, bby2 = self.rand_bbox(inputs.size(), lam)
+
+            cutmix_imgs = inputs[rand_index, :, :, :]
                 
+            inputs[:, :, bbx1:bbx2, bby1:bby2] = cutmix_imgs[:, :, bbx1:bbx2, bby1:bby2]
+            lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+
+            # compute output
             outputs = self.forward(inputs)
-            loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)   
-                        
+            loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)
+            
+
+        elif self.aug == 'cutmix_randaug' and r < 0.5:
+            in_aug = torchvision.transforms.Compose([
+                                torchvision.transforms.RandAugment(num_ops=2, magnitude=9)
+            ])
+            norm = torchvision.transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))
+            lam = np.random.beta(beta, beta)
+            rand_index = torch.randperm(inputs.size()[0]).cuda()
+
+            target_a = targets
+            target_b = targets[rand_index]
+
+            bbx1, bby1, bbx2, bby2 = self.rand_bbox(inputs.size(), lam)
+
+            cutmix_imgs = inputs[rand_index, :, :, :]
+                
+            inputs[:, :, bbx1:bbx2, bby1:bby2] = cutmix_imgs[:, :, bbx1:bbx2, bby1:bby2]
+            lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+
+            inputs = (inputs * 255).to(torch.uint8)
+            inputs = norm((in_aug(inputs) / 255))
+            # compute output
+            outputs = self.forward(inputs)
+            loss = self.criterion(outputs, target_a) * lam + self.criterion(outputs, target_b) * (1. - lam)
+            
+
         else:
             outputs = self.forward(inputs)
             loss = self.criterion(outputs, targets)

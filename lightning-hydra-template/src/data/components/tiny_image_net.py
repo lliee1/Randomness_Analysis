@@ -7,7 +7,7 @@ import cv2
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 import re
-import math
+from PIL import Image
 class TinyImagenet(Dataset):
     def __init__(self, train_path, class_ls, transform_train=None, annotation=None):
         self.train_path = train_path
@@ -36,11 +36,7 @@ class TinyImagenet(Dataset):
             target_temp = train_img_path.split('/')[-3]
             target = self.ls.index(target_temp)
 
-        train_img = cv2.imread(train_img_path, cv2.IMREAD_COLOR)
-        train_img = cv2.cvtColor(train_img, cv2.COLOR_BGR2RGB)
-        train_img = torch.Tensor(train_img)
-        train_img = train_img.permute(2,0,1)
-        train_img = train_img / 255.
+        train_img = Image.open(train_img_path).convert("RGB")
 
         if self.transform_train:
             train_img = self.transform_train(train_img)

@@ -87,7 +87,6 @@ class cifar100DataModule(LightningDataModule):
         pin_memory: bool = False,
         aug: str = '',
         normalize: bool = False,
-        resize: bool = False,
     ) -> None:
         """Initialize a `MNISTDataModule`.
 
@@ -106,21 +105,7 @@ class cifar100DataModule(LightningDataModule):
         # sort
 
         # data transformations
-        if resize:
-            transform_train = transforms.Compose([
-                                transforms.Resize(384, interpolation=InterpolationMode.BICUBIC),
-                                transforms.RandomHorizontalFlip(),
-                                transforms.Normalize(
-                                    mean=(0.485, 0.456, 0.406),
-                                    std=(0.229, 0.224, 0.225))
-                                ])
-            transform_test = transforms.Compose([
-                                transforms.Resize(384, interpolation=InterpolationMode.BICUBIC),
-                                transforms.Normalize(
-                                    mean=(0.485, 0.456, 0.406),
-                                    std=(0.229, 0.224, 0.225))
-                                ])
-        elif normalize:
+        if normalize:
             transform_train = transforms.Compose([
                                 transforms.RandomCrop(32, padding=4),
                                 transforms.RandomHorizontalFlip(),
@@ -133,7 +118,7 @@ class cifar100DataModule(LightningDataModule):
                                 transforms.Normalize(
                                     mean=(0.485, 0.456, 0.406),
                                     std=(0.229, 0.224, 0.225))
-                                ])
+                                ])       
             
         else:
             transform_train = transforms.Compose([
@@ -151,8 +136,43 @@ class cifar100DataModule(LightningDataModule):
         if aug == 'cutout':
             transform_train.transforms.append(Cutout(n_holes=1, length=8))
             
-        self.data_train: Optional[Dataset] = torchvision.datasets.CIFAR100('./', train=True, download=True, transform=transform_train)
-        self.data_val: Optional[Dataset] = torchvision.datasets.CIFAR100('./', train=False, download=True, transform=transform_test)
+        elif aug == 'randaug_cutmix' or aug == 'randaug_mixup':
+            transform_train = transforms.Compose([
+                                transforms.RandomCrop(32, padding=4),
+                                transforms.RandomHorizontalFlip(),
+                                torchvision.transforms.RandAugment(num_ops=2, magnitude=9),
+                                transforms.ToTensor(),
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5),
+                                )])
+            
+        elif aug == 'randaug_cutmix_n1':
+            transform_train = transforms.Compose([
+                                transforms.RandomCrop(32, padding=4),
+                                transforms.RandomHorizontalFlip(),
+                                torchvision.transforms.RandAugment(num_ops=1, magnitude=9),
+                                transforms.ToTensor(),
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5),
+                                )])
+            
+        elif aug == 'randaug_cutmix_n3':
+            transform_train = transforms.Compose([
+                                transforms.RandomCrop(32, padding=4),
+                                transforms.RandomHorizontalFlip(),
+                                torchvision.transforms.RandAugment(num_ops=3, magnitude=9),
+                                transforms.ToTensor(),
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5),
+                                )])    
+            
+        elif aug == 'cutmix_randaug' or aug == 'mixup_randaug':
+            transform_train = transforms.Compose([
+                                transforms.RandomCrop(32, padding=4),
+                                transforms.RandomHorizontalFlip(),
+                                transforms.ToTensor()
+                                ])
+            
+
+        self.data_train: Optional[Dataset] = torchvision.datasets.CIFAR100('./data', train=True, download=True, transform=transform_train)
+        self.data_val: Optional[Dataset] = torchvision.datasets.CIFAR100('./data', train=False, download=True, transform=transform_test)
         self.data_test: Optional[Dataset] = None
         print('DataModule Done . . .')
 

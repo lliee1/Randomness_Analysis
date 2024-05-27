@@ -13,7 +13,7 @@ net:
   model_name: 'resnet50.a1_in1k'
   pretrained: False
 
-aug: mixup
+aug: baseline
 model_name: 'resnet50'
 
 # compile model for faster training with pytorch 2.0

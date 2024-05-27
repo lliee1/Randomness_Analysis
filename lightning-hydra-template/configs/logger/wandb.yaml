@@ -7,11 +7,11 @@ wandb:
   offline: False
   id: null # pass correct id to resume experiment!
   anonymous: null # enable anonymous logging
-  project: "cifar100"
-  name: "mixup_cifar100_resnet50_300epoch"
+  project: "your_project_name"
+  name: "your_experiment_name"
   log_model: False # upload lightning ckpts
   prefix: "" # a string to put at the beginning of metric keys
   # entity: "" # set to name of your wandb team
-  group: "model_test"
+  group: "group_name"
   tags: []
   job_type: ""
