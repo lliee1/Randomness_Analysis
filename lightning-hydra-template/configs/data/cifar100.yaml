@@ -2,5 +2,5 @@ _target_: src.data.cifar100_datamodule.cifar100DataModule
 batch_size: 64
 num_workers: 4
 pin_memory: True
-aug: baseline
+aug: randaug_mixup_resize224
 normalize: False

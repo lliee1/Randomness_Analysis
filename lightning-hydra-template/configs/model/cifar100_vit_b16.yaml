@@ -1,0 +1,21 @@
+_target_: src.models.cifar100_module.cifar100Module
+
+optimizer:
+  _target_: torch.optim.SGD
+  _partial_: true
+  lr: 1e-2
+  momentum: 0.9
+  weight_decay: 1e-4
+
+scheduler: null
+net:
+  _target_: timm.create_model
+  model_name: 'vit_base_patch16_224_miil'
+  pretrained: True
+  num_classes: 100
+
+aug: cutmix_randaug
+model_name: 'vit-b16'
+
+# compile model for faster training with pytorch 2.0
+compile: false

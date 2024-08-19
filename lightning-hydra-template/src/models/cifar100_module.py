@@ -67,10 +67,15 @@ class cifar100Module(LightningModule):
         
         self.net = net
         
-        if model_name != 'wide_resnet':
+        if 'efficientnet' in model_name:
+            num_ftrs = net.classifier[1].in_features
+            net.classifier[1] = nn.Linear(num_ftrs, 100)
+            
+        elif 'resnet' in model_name:
             num_classes = 100
             net.reset_classifier(num_classes=num_classes)
             
+        print(net)
 
         # loss function
         self.criterion = torch.nn.CrossEntropyLoss()
@@ -107,8 +112,8 @@ class cifar100Module(LightningModule):
 
         cut_rat = np.sqrt(1. - lam)
 
-        cut_w = np.int(W * cut_rat)
-        cut_h = np.int(H * cut_rat)
+        cut_w = np.int_(W * cut_rat)
+        cut_h = np.int_(H * cut_rat)
 
         cx = np.random.randint(W)
         cy = np.random.randint(H)

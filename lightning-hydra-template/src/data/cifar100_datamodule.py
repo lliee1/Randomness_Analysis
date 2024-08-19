@@ -119,7 +119,63 @@ class cifar100DataModule(LightningDataModule):
                                     mean=(0.485, 0.456, 0.406),
                                     std=(0.229, 0.224, 0.225))
                                 ])       
+
+        elif aug == 'resize224':
+            transform_train = transforms.Compose([
+                                transforms.Resize((224,224)),
+                                transforms.RandomHorizontalFlip(),
+                                transforms.ToTensor(),
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5),
+                                )])
+
+            transform_test = transforms.Compose([
+                                transforms.Resize((224,224)),
+                                transforms.ToTensor(),
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)),
+                                ])
             
+        elif aug == 'resize600':
+            transform_train = transforms.Compose([
+                                transforms.Resize((600,600)),
+                                transforms.RandomHorizontalFlip(),
+                                transforms.ToTensor(),
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5),
+                                )])
+
+            transform_test = transforms.Compose([
+                                transforms.Resize((600,600)),
+                                transforms.ToTensor(),
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)),
+                                ])  
+                    
+        elif aug == 'randaug_cutmix_resize224' or aug == 'randaug_mixup_resize224':
+            transform_train = transforms.Compose([
+                                transforms.Resize((224,224)),
+                                transforms.RandomHorizontalFlip(),
+                                torchvision.transforms.RandAugment(num_ops=2, magnitude=9),
+                                transforms.ToTensor(),
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5),
+                                )])
+
+            transform_test = transforms.Compose([
+                                transforms.Resize((224,224)),
+                                transforms.ToTensor(),
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)),
+                                ])
+
+        elif aug == 'cutmix_randaug_resize224' or aug == 'mixup_randaug_resize224':
+            transform_train = transforms.Compose([
+                                transforms.Resize((224,224)),
+                                transforms.RandomHorizontalFlip(),
+                                transforms.ToTensor()
+                                ])
+            
+            transform_test = transforms.Compose([
+                                transforms.Resize((224,224)),
+                                transforms.ToTensor(),
+                                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)),
+                                ])
+                       
         else:
             transform_train = transforms.Compose([
                                 transforms.RandomCrop(32, padding=4),
@@ -169,7 +225,7 @@ class cifar100DataModule(LightningDataModule):
                                 transforms.RandomHorizontalFlip(),
                                 transforms.ToTensor()
                                 ])
-            
+                    
 
         self.data_train: Optional[Dataset] = torchvision.datasets.CIFAR100('./data', train=True, download=True, transform=transform_train)
         self.data_val: Optional[Dataset] = torchvision.datasets.CIFAR100('./data', train=False, download=True, transform=transform_test)
